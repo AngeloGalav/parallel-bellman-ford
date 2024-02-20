@@ -1,0 +1,3 @@
+openmp/build
+cuda/build
+.vscode
