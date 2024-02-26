@@ -7,22 +7,12 @@
 
 int main(int argc, char *argv[])
 {
-    // struct Node* nodesList[20];
-    // int V = 5; // Number of vertices in the graph
-    // int E = 10; // Number of edges in the graph
-    // struct Graph* graph = initGraph(V, E);
-
-    // // // Adding edges
-    // addEdge(graph, 0, 0, 1, 1);
-    // addEdge(graph, 1, 0, 4, 2);
-
-    // addNode(nodesList[0]);
-
-    // // Print the graph
-    // printGraph(graph);
-
+    Graph* graphino = initGraph(5, 20);
+    graphSanityTest(graphino);
 
 // Beginning of parallel region
+
+    printf("Printing test message from OpenMP...\n");
 #pragma omp parallel
     {
 
@@ -30,4 +20,5 @@ int main(int argc, char *argv[])
                omp_get_thread_num());
     }
     // Ending of parallel region
+
 }

@@ -10,10 +10,11 @@ typedef struct node {
 typedef struct graph
 {
     int V, E;
-    Node* nodes;
+    Node** nodes;
 } Graph;
 
 Graph *initGraph(int V, int E);
 Graph *createTestGraph();
 void addEdge(Graph* graph, int edgeIndex, int src, int dest, int cost);
 void printGraph(Graph *graph);
+void graphSanityTest(Graph* graph);
