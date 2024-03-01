@@ -24,21 +24,23 @@ void addEdge(Graph *graph, int src, int dest, int cost)
 Graph *createTestGraph()
 {
     int V = 5;
-    int E = 7;
+    int E = 8;
     Graph *graph = initGraph(V, E);
+
     for (int i = 0; i < V; i++)
     {
         graph->nodes[i] = malloc(sizeof(Node));
         graph->nodes[i]->id = i;
     }
 
-    addEdge(graph, 1, 3, 1);
-    addEdge(graph, 1, 2, 1);
-    addEdge(graph, 1, 4, 1);
-    addEdge(graph, 1, 0, 1);
-    addEdge(graph, 4, 0, 1);
-    addEdge(graph, 2, 3, -1);
-    addEdge(graph, 2, 5, -1);
+    addEdge(graph, 0, 1, -1);
+    addEdge(graph, 0, 2, 4);
+    addEdge(graph, 1, 2, 3);
+    addEdge(graph, 1, 3, 2);
+    addEdge(graph, 1, 4, 2);
+    addEdge(graph, 3, 2, 5);
+    addEdge(graph, 3, 1, 1);
+    addEdge(graph, 4, 3, -3);
 
     return graph;
 }

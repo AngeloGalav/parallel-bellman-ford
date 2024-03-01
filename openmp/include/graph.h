@@ -1,3 +1,6 @@
+#ifndef GRAPH_H
+#define GRAPH_H
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -18,3 +21,5 @@ Graph *createTestGraph();
 void addEdge(Graph* graph, int src, int dest, int cost);
 void printGraph(Graph *graph);
 void printEdgesOfNode(Node *node);
+
+#endif

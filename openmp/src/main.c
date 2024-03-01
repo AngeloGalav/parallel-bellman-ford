@@ -4,11 +4,16 @@
 // OpenMP header
 #include <omp.h>
 #include "../include/graph.h"
+#include "../include/bellmanford.h"
+
 
 int main(int argc, char *argv[])
 {
     Graph* graphino = createTestGraph();
-    printGraph(graphino);
+    // printGraph(graphino);
+    BellmanFord(graphino, 0);
+
+    printf("\n");
 
 // Beginning of parallel region
 
