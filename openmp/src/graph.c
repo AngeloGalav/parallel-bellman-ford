@@ -9,39 +9,16 @@ Graph *initGraph(int V, int E)
     return graph;
 }
 
-void graphSanityTest(Graph *graph)
+void addEdge(Graph *graph, int src, int dest, int cost)
 {
-    Node **nodesList = graph->nodes;
-    int N = graph->V;
-    for (int i = 0; i < N; i++)
+    Node *hd = graph->nodes[src];
+    while (hd->next != NULL)
     {
-        nodesList[i] = (Node *)malloc(sizeof(Node));
-        nodesList[i]->id = i;
-        nodesList[i]->next = (Node *)malloc(sizeof(Node));
-        (nodesList[i]->next)->id = i + 100;
+        hd = hd->next;
     }
-    for (int j = 0; j < 1; j++)
-    {
-        printf("read number %d\n", j);
-        for (int i = 0; i < N; i++)
-        {
-            printf("sanity of base id:%d\n", nodesList[i]->id);
-            printf("sanity of next id:%d\n", nodesList[i]->next->id);
-        }
-        printf("\n");
-    }
-
-    free(graph->nodes);
-}
-
-void addNode(Node *nodeL)
-{
-    nodeL->next = (Node *)malloc(sizeof(Node));
-}
-
-void addEdge(Graph *graph, int edgeIndex, int src, int dest, int cost)
-{
-
+    hd->next = malloc(sizeof(Node));
+    hd->next->id = dest;
+    hd->next->cost = cost;
 }
 
 Graph *createTestGraph()
@@ -49,6 +26,19 @@ Graph *createTestGraph()
     int V = 5;
     int E = 7;
     Graph *graph = initGraph(V, E);
+    for (int i = 0; i < V; i++)
+    {
+        graph->nodes[i] = malloc(sizeof(Node));
+        graph->nodes[i]->id = i;
+    }
+
+    addEdge(graph, 1, 3, 1);
+    addEdge(graph, 1, 2, 1);
+    addEdge(graph, 1, 4, 1);
+    addEdge(graph, 1, 0, 1);
+    addEdge(graph, 4, 0, 1);
+    addEdge(graph, 2, 3, -1);
+    addEdge(graph, 2, 5, -1);
 
     return graph;
 }
@@ -56,9 +46,21 @@ Graph *createTestGraph()
 void printGraph(Graph *graph)
 {
     printf("Graph edges:\n");
-    for (int i = 0; i < graph->E; ++i)
+    for (int i = 0; i < graph->V; ++i)
     {
-        // printf("edge %d, nodes %d -- %d,  cost %d\n", i, graph->edge[i].src,
-        //    graph->edge[i].dest, graph->edge[i].cost);
+        printf("info of %d: ", i);
+        printEdgesOfNode(graph->nodes[i]);
     }
+}
+
+void printEdgesOfNode(Node *node)
+{
+    Node *hd = node;
+    printf("Node %d is attached to nodes", node->id);
+    while (hd->next != NULL)
+    {
+        hd = hd->next;
+        printf(" %d,", hd->id);
+    }
+    printf(" - END\n");
 }

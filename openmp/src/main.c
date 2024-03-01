@@ -7,8 +7,8 @@
 
 int main(int argc, char *argv[])
 {
-    Graph* graphino = initGraph(5, 20);
-    graphSanityTest(graphino);
+    Graph* graphino = createTestGraph();
+    printGraph(graphino);
 
 // Beginning of parallel region
 
