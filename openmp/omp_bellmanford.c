@@ -107,6 +107,10 @@ void printArr(int dist[], int n)
         printf("%d \t\t %d\n", i, dist[i]);
 }
 
+//
+// Graph manager functions
+// Don't give too much weight to this code
+//
 Graph *initGraph(int V, int E)
 {
     Graph *graph = (Graph *)malloc(sizeof(Graph));
@@ -140,7 +144,7 @@ Graph *createTestGraph()
         graph->nodes[i]->id = i;
     }
 
-    addEdge(graph, 0, 1, -1);
+    addEdge(graph, 0, 1, 1);
     addEdge(graph, 0, 2, 4);
     addEdge(graph, 1, 2, 3);
     addEdge(graph, 1, 3, 2);
