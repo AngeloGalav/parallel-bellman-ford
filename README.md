@@ -11,9 +11,22 @@ From [Wikipedia](https://en.wikipedia.org/wiki/Bellman%E2%80%93Ford_algorithm):
 
 Pending.
 
+## Usage
+For OMP
+Usage:
+```
+./omp-bf [threads]
+```
+
+For Graph maker:
+```
+usage: graph_maker.py [-h] [-v NODES] [-e EDGES] [-neg | --negative | --no-negative]
+```
+
 ## Compiling
 
 ### Linux
+
 
 Pending.
 
@@ -23,6 +36,7 @@ Pending.
 
 ## TODO:
 
-- [ ] refactor code so it's in a single file
 - [ ] OpenMP stuff
+    - [ ] Handle time recording
+    - [ ] omp num of threads
 - [ ] Cuda stuff
