@@ -101,7 +101,7 @@ int *BellmanFord(Graph *graph, int src) {
 
     // compute distance array
     for (i = 1; i < V; i++) {
-#pragma omp parallel for private(u, v, weight, j) schedule(static)
+#pragma omp parallel for private(u, v, weight, j) shared(dist) schedule(static)
         for (j = 0; j < V; j++) {
             u = j;
             hd = graph->nodes[u]->next;
@@ -111,7 +111,7 @@ int *BellmanFord(Graph *graph, int src) {
                 weight = hd->cost;
 
                 if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v]) {
-#pragma omp critical
+#pragma omp atomic write
                     dist[v] = dist[u] + weight;
                 }
 
