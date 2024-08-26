@@ -14,17 +14,15 @@ typedef struct graph {
     Node **nodes;
 } Graph;
 
-void BellmanFord(Graph *graph, int src);
+int *BellmanFord(Graph *graph, int src);
 void printArr(int dist[], int n);
 Graph *initGraph(int V, int E);
 void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional);
-Graph *createTestGraph();
 Graph *createGraphFromFile(char *filename);
 void printGraph(Graph *graph);
 void printEdgesOfNode(Node *node);
 
 int main(int argc, char *argv[]) {
-    int n_threads = 1;
     char *n_threads_s = argv[1];
     char *graph_file = argv[2];
 
@@ -39,20 +37,31 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    n_threads = atoi(n_threads_s);
-    Graph *childish_graphino = createGraphFromFile(graph_file);
+    // setting the number of threads
+    omp_set_num_threads(atoi(n_threads_s));
 
-    if (childish_graphino != NULL) BellmanFord(childish_graphino, 0);
+    // generating the graph
+    Graph *graph = createGraphFromFile(graph_file);
+    if (graph == NULL) {
+        printf("Error creating graph\n");
+        return -1;
+    };
+
+    int *dist_result;
+    double time_start, time_end;
+
+    time_start = omp_get_wtime();
+    dist_result = BellmanFord(graph, 0);
+    time_end = omp_get_wtime();
+
+    double total_time = time_end - time_start;
+
+    // printing the distance array (i.e. the result)
+    printArr(dist_result, graph->V);
 
     printf("\n");
 
-    // Beginning of parallel region
-
-    //     printf("[TEST] Printing test message from OpenMP...\n");
-    // #pragma omp parallel
-    //     { printf("Hello World... from thread = %d\n", omp_get_thread_num());
-    //     }
-    // Ending of parallel region
+    printf("Total execution time: %f seconds\n", total_time);
 }
 
 Graph *createGraphFromFile(char *filename) {
@@ -66,12 +75,6 @@ Graph *createGraphFromFile(char *filename) {
     fscanf(file, "%d %d", &V, &E);
     Graph *graph = initGraph(V, E);
 
-    // TODO: move this code to initGraph
-    for (int i = 0; i < V; i++) {
-        graph->nodes[i] = malloc(sizeof(Node));
-        graph->nodes[i]->id = i;
-    }
-
     for (int i = 0; i < E; i++) {
         int u, v, weight;
         fscanf(file, "%d %d %d", &u, &v, &weight);
@@ -82,54 +85,66 @@ Graph *createGraphFromFile(char *filename) {
     return graph;
 }
 
-void BellmanFord(Graph *graph, int src) {
+int *BellmanFord(Graph *graph, int src) {
     int V = graph->V;
-    int E = graph->E;
-    int dist[V];
+    int *dist = malloc(sizeof(int) * V);
+    // declaring variables here in order for the scoping to work
+    int i, j, u, v, weight;
+    Node *hd;
 
-    // this definitely can be parallelized
-    for (int i = 0; i < V; i++) dist[i] = INT_MAX;
+#pragma omp parallel for
+    for (i = 0; i < V; i++) {
+        dist[i] = INT_MAX;
+    }
 
     dist[src] = 0;
 
     // compute distance array
-    for (int i = 1; i < V; i++) {
-        for (int j = 0; j < V; j++) {
-            int u = j;
-            Node *hd = graph->nodes[j]->next;
+    for (i = 1; i < V; i++) {
+#pragma omp parallel for private(u, v, weight, j) schedule(static)
+        for (j = 0; j < V; j++) {
+            u = j;
+            hd = graph->nodes[u]->next;
+#pragma omp task firstprivate(hd)
             while (hd != NULL) {
-                int v = hd->id;
-                int weight = hd->cost;
+                v = hd->id;
+                weight = hd->cost;
 
-                if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v])
+                if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v]) {
+#pragma omp critical
                     dist[v] = dist[u] + weight;
+                }
 
                 hd = hd->next;
             }
         }
     }
 
-    // if graph still has a shorter path, then there's a negative cycle
-    for (int j = 0; j < V; j++) {
-        int u = j;
-        Node *hd = graph->nodes[0]->next;
+    int neg_check = 0;
+
+// if graph still has a shorter path, then there's a negative cycle
+#pragma omp parallel for private(u, v, weight, i) schedule(static)
+    for (i = 0; i < V; i++) {
+        u = i;
+        hd = graph->nodes[0]->next;
+
+#pragma omp task firstprivate(hd)
         while (hd != NULL) {
             int v = hd->id;
             int weight = hd->cost;
 
+            // If negative cycle is detected, simply return
             if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
                 printf("Graph contains negative weight cycle\n");
-                return;  // If negative cycle is detected, simply
-                // return
+                neg_check = 1;
             }
 
             hd = hd->next;
         }
     }
 
-    printArr(dist, V);
-
-    return;
+    if (neg_check) return NULL;
+    return dist;
 }
 
 void printArr(int dist[], int n) {
@@ -138,19 +153,20 @@ void printArr(int dist[], int n) {
 }
 
 //
-// Graph manager functions
-// Don't give too much weight to this code
+// Graph handling functions
 //
+//
+
 Graph *initGraph(int V, int E) {
     Graph *graph = (Graph *)malloc(sizeof(Graph));
     graph->V = V;
     graph->E = E;
     graph->nodes = (Node **)malloc(V * sizeof(Node *));
 
-    // for (int i = 0; i < V; i++) {
-    //     graph->nodes[i] = malloc(sizeof(Node));
-    //     graph->nodes[i]->id = i;
-    // }
+    for (int i = 0; i < V; i++) {
+        graph->nodes[i] = malloc(sizeof(Node));
+        graph->nodes[i]->id = i;
+    }
 
     return graph;
 }
@@ -165,28 +181,6 @@ void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional) {
     hd->next->cost = cost;
 
     if (bidirectional) addEdge(graph, dest, src, cost, 0);
-}
-
-Graph *createTestGraph() {
-    int V = 5;
-    int E = 8;
-    Graph *graph = initGraph(V, E);
-
-    for (int i = 0; i < V; i++) {
-        graph->nodes[i] = malloc(sizeof(Node));
-        graph->nodes[i]->id = i;
-    }
-
-    addEdge(graph, 0, 1, 1, 1);
-    addEdge(graph, 0, 2, 4, 1);
-    addEdge(graph, 1, 2, 3, 1);
-    addEdge(graph, 1, 3, 2, 1);
-    addEdge(graph, 1, 4, 2, 1);
-    addEdge(graph, 3, 2, 5, 1);
-    addEdge(graph, 3, 1, 1, 1);
-    addEdge(graph, 4, 3, -3, 1);
-
-    return graph;
 }
 
 void printGraph(Graph *graph) {
