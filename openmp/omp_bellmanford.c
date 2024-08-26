@@ -88,11 +88,16 @@ Graph *createGraphFromFile(char *filename) {
 int *BellmanFord(Graph *graph, int src) {
     int V = graph->V;
     int *dist = malloc(sizeof(int) * V);
+    if (dist == NULL) {
+        perror("Failed to allocate memory");
+        return NULL;
+    }
+
     // declaring variables here in order for the scoping to work
     int i, j, u, v, weight;
     Node *hd;
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
     for (i = 0; i < V; i++) {
         dist[i] = INT_MAX;
     }
@@ -101,11 +106,10 @@ int *BellmanFord(Graph *graph, int src) {
 
     // compute distance array
     for (i = 1; i < V; i++) {
-#pragma omp parallel for private(u, v, weight, j) shared(dist) schedule(static)
+#pragma omp parallel for private(u, v, weight, j, hd) shared(dist) schedule(static)
         for (j = 0; j < V; j++) {
             u = j;
             hd = graph->nodes[u]->next;
-#pragma omp task firstprivate(hd)
             while (hd != NULL) {
                 v = hd->id;
                 weight = hd->cost;
@@ -123,12 +127,11 @@ int *BellmanFord(Graph *graph, int src) {
     int neg_check = 0;
 
 // if graph still has a shorter path, then there's a negative cycle
-#pragma omp parallel for private(u, v, weight, i) schedule(static)
+#pragma omp parallel for private(u, v, weight, i, hd) schedule(static)
     for (i = 0; i < V; i++) {
         u = i;
         hd = graph->nodes[0]->next;
 
-#pragma omp task firstprivate(hd)
         while (hd != NULL) {
             int v = hd->id;
             int weight = hd->cost;
@@ -136,6 +139,7 @@ int *BellmanFord(Graph *graph, int src) {
             // If negative cycle is detected, simply return
             if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
                 printf("Graph contains negative weight cycle\n");
+#pragma omp atomic write
                 neg_check = 1;
             }
 
