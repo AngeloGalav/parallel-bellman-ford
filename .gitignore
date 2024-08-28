@@ -1,7 +1,10 @@
-openmp/build
-cuda/build
 .vscode
 omp-bf
+omp-bf.exe
+cuda-bf
+cuda-bf.exe
+cuda-bf.exp
+cuda-bf.lib
 results
 omp.csv
 cuda.csv
