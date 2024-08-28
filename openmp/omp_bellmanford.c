@@ -18,6 +18,7 @@ int *BellmanFord(Graph *graph, int src);
 void printArr(int dist[], int n);
 Graph *initGraph(int V, int E);
 void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional);
+void printInfoToFile(char *graph_file, double total_time, int threads);
 Graph *createGraphFromFile(char *filename);
 void printGraph(Graph *graph);
 void printEdgesOfNode(Node *node);
@@ -38,7 +39,8 @@ int main(int argc, char *argv[]) {
     }
 
     // setting the number of threads
-    omp_set_num_threads(atoi(n_threads_s));
+    int n_threads = atoi(n_threads_s);
+    omp_set_num_threads(n_threads);
 
     // generating the graph
     Graph *graph = createGraphFromFile(graph_file);
@@ -47,21 +49,24 @@ int main(int argc, char *argv[]) {
         return -1;
     };
 
-    int *dist_result;
     double time_start, time_end;
 
     time_start = omp_get_wtime();
+    int *dist_result;
     dist_result = BellmanFord(graph, 0);
     time_end = omp_get_wtime();
 
     double total_time = time_end - time_start;
 
     // printing the distance array (i.e. the result)
-    printArr(dist_result, graph->V);
+    // printArr(dist_result, graph->V);
 
-    printf("\n");
+    // printf("\n");
 
     printf("Total execution time: %f seconds\n", total_time);
+    printInfoToFile(graph_file, total_time, n_threads);
+
+    return 0;
 }
 
 Graph *createGraphFromFile(char *filename) {
@@ -85,6 +90,29 @@ Graph *createGraphFromFile(char *filename) {
     return graph;
 }
 
+void printInfoToFile(char *graph_file, double total_time, int threads) {
+    // Define the file path
+    char file_path[256];
+    snprintf(file_path, sizeof(file_path), "results/omp.csv");
+
+    FILE *file = fopen(file_path, "a");
+    if (!file) {
+        fprintf(stderr,
+                "Failed to open file: %s, creating file on WD instead...\n",
+                file_path);
+        snprintf(file_path, sizeof(file_path), "omp.csv");
+        file = fopen(file_path, "a");
+        if (!file) {
+            fprintf(stderr, "Failed to open file again, aborting.");
+            return;
+        }
+        printf("File created successfully!\n");
+    }
+
+    fprintf(file, "%s,%d,%.6f\n", graph_file, threads, total_time);
+    fclose(file);
+}
+
 int *BellmanFord(Graph *graph, int src) {
     int V = graph->V;
     int *dist = malloc(sizeof(int) * V);
@@ -106,7 +134,8 @@ int *BellmanFord(Graph *graph, int src) {
 
     // compute distance array
     for (i = 1; i < V; i++) {
-#pragma omp parallel for private(u, v, weight, j, hd) shared(dist) schedule(static)
+#pragma omp parallel for private(u, v, weight, j, hd) shared(dist) \
+    schedule(static)
         for (j = 0; j < V; j++) {
             u = j;
             hd = graph->nodes[u]->next;

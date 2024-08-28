@@ -2,3 +2,6 @@ openmp/build
 cuda/build
 .vscode
 omp-bf
+results
+omp.csv
+cuda.csv
