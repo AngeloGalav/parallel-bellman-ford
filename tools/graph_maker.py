@@ -32,9 +32,9 @@ def create_graph_file(V, E) :
     for (u,v,w) in G.edges(data=True):
         w['weight'] = random.randint(*range_w)
 
-    filename = 'graph.txt'
-    base_filename = filename
-    counter = 1
+    filename = 'graph_0.txt'
+    base_filename = 'graph.txt'
+    counter = 0
 
     while os.path.exists(filename):
         filename = f"{base_filename.rsplit('.', 1)[0]}_{counter}.txt"

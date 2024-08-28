@@ -1,4 +1,9 @@
 import sys
+import argparse
+
+parser = argparse.ArgumentParser(description="Tests the BF algorithm on a graph (sanity check).")
+parser.add_argument("-g", "--graph", type=str, help="Graph filename", required=False)
+args = parser.parse_args()
 
 def bellman_ford(vertices, edges, start):
     # Initialize distance to all vertices as infinite and distance to start as 0
@@ -39,8 +44,13 @@ def read_graph_from_file(filename):
     return vertices, edges
 
 if __name__ == "__main__":
-    filename = "graph_1.txt"
-    start_vertex = 0  # Change this to the desired start vertex
+
+    if args.graph is None :
+        print("Graph file not provided.")
+        exit()
+    else :
+        filename = args.graph
+    start_vertex = 0
 
     vertices, edges = read_graph_from_file(filename)
     bellman_ford(vertices, edges, start_vertex)
