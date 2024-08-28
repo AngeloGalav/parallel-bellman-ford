@@ -16,13 +16,13 @@ threads=(1 2 3 4 5 6 7 8 9 10 16)
 
 graph_files=$(ls graphs/)
 
-# TODO: CHANGE TIMEOUT TO 5 MINUTES !!!!
 for n in "${threads[@]}"; do
   for graph_file in $graph_files; do
     echo "Running omp-bf on $graph_file with $n threads"
-    timeout 20s ./omp-bf "$n" "graphs/$graph_file"
+    timeout 3m ./omp-bf "$n" "graphs/$graph_file"
     if [ $? -eq 124 ]; then
       echo "Execution timed out for $graph_file with $n threads"
+      echo "graphs/${graph_file},${n},TO" >> results/omp.csv
     fi
   done
 done
