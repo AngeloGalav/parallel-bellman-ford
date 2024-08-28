@@ -10,7 +10,7 @@
 
 //  Different implementation of cuda_gettime depending on
 //  the OS used by the user, as Windows is not POSIX compliant
-#ifndef WIN32
+#ifdef _WIN32
 #include <windows.h>
 #define MS_PER_SEC      1000ULL     // MS = milliseconds
 #define US_PER_MS       1000ULL     // US = microseconds
@@ -41,7 +41,7 @@ double cuda_gettime(void)
     ts.tv_nsec = (long)(((ticks.QuadPart % ticksPerSec.QuadPart) * NS_PER_SEC) / ticksPerSec.QuadPart);
     return ts.tv_sec + (double)ts.tv_nsec / 1e9;
 }
-#elif UNIX
+#elif __unix__
 double cuda_gettime( void )
 {
     struct timespec ts;
@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
     // int n_threads = atoi(n_threads_s);
 
     // generating the graph
-    const char* filename = "graphs/graph_1.txt";
+    const char* filename = "graphs/graph_5.txt";
     char graph_filename[100];
     strcpy(graph_filename, filename);
 
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
     double total_time = time_end - time_start;
 
     // printing the distance array (i.e. the result)
-    printArr(dist_result, graph->V);
+    // printArr(dist_result, graph->V);
 
     printf("\n");
 
