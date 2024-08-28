@@ -115,7 +115,7 @@ void printInfoToFile(char *graph_file, double total_time, int threads) {
 
 int *BellmanFord(Graph *graph, int src) {
     int V = graph->V;
-    int *dist = malloc(sizeof(int) * V);
+    int *dist = (int *)malloc(sizeof(int) * V);
     if (dist == NULL) {
         perror("Failed to allocate memory");
         return NULL;
@@ -197,8 +197,9 @@ Graph *initGraph(int V, int E) {
     graph->nodes = (Node **)malloc(V * sizeof(Node *));
 
     for (int i = 0; i < V; i++) {
-        graph->nodes[i] = malloc(sizeof(Node));
+        graph->nodes[i] = (Node *)malloc(sizeof(Node));
         graph->nodes[i]->id = i;
+        graph->nodes[i]->next = NULL;
     }
 
     return graph;
@@ -209,9 +210,10 @@ void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional) {
     while (hd->next != NULL) {
         hd = hd->next;
     }
-    hd->next = malloc(sizeof(Node));
+    hd->next = (Node *)malloc(sizeof(Node));
     hd->next->id = dest;
     hd->next->cost = cost;
+    hd->next->next = NULL;
 
     if (bidirectional) addEdge(graph, dest, src, cost, 0);
 }
