@@ -1,11 +1,11 @@
 #!/bin/bash
 # Runs all program on all graphs with all thread configurations
 
-# # compile openmp
-# gcc -o omp-bf openmp/omp_bellmanford.c -fopenmp -Wall
+# compile openmp
+gcc -o omp-bf openmp/omp_bellmanford.c -fopenmp -Wall
 
-# # compile cuda
-# # nvcc -o cuda-bf cuda/cuda_bellmanford.cu
+# compile cuda
+nvcc -o cuda-bf cuda/cuda_bellmanford.cu
 
 # check for folder presence
 if [ ! -d "results" ]; then
@@ -27,11 +27,9 @@ for n in "${threads[@]}"; do
   done
 done
 
-# for n in "${threads[@]}"; do
-#   for graph_file in $graph_files; do
-#     echo "Running omp_bf on $graph_file with $n threads"
-#     timeout 5m ./cuda-bf "$n" "graphs/$graph_file"
-#   done
-# done
+for graph_file in $graph_files; do
+  echo "Running omp_bf on $graph_file with $n threads"
+  timeout 3m ./cuda-bf "graphs/$graph_file"
+done
 
 # TODO: package everything into a .tar file

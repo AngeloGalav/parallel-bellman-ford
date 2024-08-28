@@ -5,8 +5,9 @@
 #include <time.h>
 #include <cuda_runtime.h>
 
-#define cudaSafeCall( err ) __cudaSafeCall( err, __FILE__, __LINE__ )
-#define cudaCheckError()    __cudaCheckError( __FILE__, __LINE__ )
+#define BLOCK_SIZE 512 // threads per block
+#define THREAD_ID (blockIdx.x * blockDim.x + threadIdx.x);
+#define N_OF_BLOCKS(N) ((N + BLOCK_SIZE - 1) / BLOCK_SIZE) // total n of blocks
 
 //  Different implementation of cuda_gettime depending on
 //  the OS used by the user, as Windows is not POSIX compliant
@@ -50,80 +51,161 @@ double cuda_gettime( void )
 }
 #endif
 
-typedef struct node {
-    int id;
+typedef struct edge {
+    int u;
+    int v;
     int cost;
-    struct node *next;
-} Node;
+} Edge;
 
 typedef struct graph {
     int V, E;
-    Node **nodes;
+    Edge *edges;
 } Graph;
 
-__global__ void initDistArray(){
-
-}
-
-int *BellmanFord(Graph *graph, int src);
+int *BellmanFord(Graph *graph, int src, double* time);
 void printArr(int dist[], int n);
 Graph *initGraph(int V, int E);
 void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional);
-void printInfoToFile(char *graph_file, double total_time, int threads);
-Graph *createGraphFromFile(char *filename);
-void printGraph(Graph *graph);
-void printEdgesOfNode(Node *node);
+void printInfoToFile(char *graph_file, double total_time);
+Graph *createGraphFromFile(char *filename, int bidirectional);
+
+__global__ void relaxationStep(int* dist, int E, Edge* edges);
+__global__ void checkNegative(int* dist, int E, Edge* edges, int* neg_check);
+__global__ void initDistArray(int* dist, int V);
 
 int main(int argc, char *argv[]) {
-    // char *n_threads_s = argv[1];
-    // char *graph_file = argv[2];
+    char *graph_file = argv[1];
 
-    // // doing a background check on these guys
-    // // if (n_threads_s == NULL) {
-    // //     printf("ERROR: No threads inputted.\n");
-    // //     return -1;
-    // // }
+    if (graph_file == NULL) {
+        printf("ERROR: No graph file inputted.\n");
+        return -1;
+    }
 
-    // if (graph_file == NULL) {
-    //     printf("ERROR: No graph file inputted.\n");
-    //     return -1;
-    // }
-
-    // // setting the number of threads
-    // int n_threads = atoi(n_threads_s);
-
-    // generating the graph
-    const char* filename = "graphs/graph_5.txt";
+    // building the graph
+    const char* filename = graph_file;
     char graph_filename[100];
     strcpy(graph_filename, filename);
 
-    Graph *graph = createGraphFromFile(graph_filename);
+    Graph *graph = createGraphFromFile(graph_filename, 1);
     if (graph == NULL) {
         printf("Error creating graph\n");
         return -1;
     };
 
+    // distance array on GPU
+    int *dist_gpu;
+    // time "without" memory overhead
+    double* total_time = (double*)malloc(sizeof(double));
     double time_start, time_end;
 
     time_start = cuda_gettime();
-    int *dist_result;
-    dist_result = BellmanFord(graph, 0);
+    dist_gpu = BellmanFord(graph, 0, total_time);
+    cudaDeviceSynchronize();
     time_end = cuda_gettime();
 
-    double total_time = time_end - time_start;
+    // time with memory overhead
+    double total_time_ov = time_end - time_start;
+    if (dist_gpu == NULL) return -1;
+
+    // create cpu copy of distance  array
+    int* dist_cpu = (int*) malloc(sizeof(int)*graph->V);
+    cudaMemcpy(dist_cpu, dist_gpu, sizeof(int)*graph->V, cudaMemcpyDeviceToHost);
 
     // printing the distance array (i.e. the result)
-    // printArr(dist_result, graph->V);
-
+    printArr(dist_cpu, graph->V);
     printf("\n");
+    cudaFree(dist_gpu);
+    free(dist_cpu);
 
-    printf("Total execution time: %f seconds\n", total_time);
-    // printInfoToFile(graph_file, total_time, n_threads);
+    printf("Total execution time: %f seconds\n", *total_time);
+    printf("With memory transfer overhead: %f seconds\n", total_time_ov);
+    printInfoToFile(graph_file, *total_time);
 
     return 0;
 }
 
-Graph *createGraphFromFile(char *filename) {
+int *BellmanFord(Graph *graph, int src, double *total_time) {
+    int V = graph->V;
+    int E = graph->E;
+
+    // allocate gpu memory
+    Edge* edges_gpu;
+    cudaMalloc(&edges_gpu, (E * sizeof(Edge)));
+    cudaMemcpy(edges_gpu, graph->edges, E * sizeof(Edge), cudaMemcpyHostToDevice);
+
+    int *dist;
+    cudaMalloc(&dist, sizeof(int) * V);
+
+    int* neg_check_gpu;
+    int neg_check;
+    cudaMalloc(&neg_check_gpu, sizeof(int));
+
+    double time_start, time_end;
+
+    // introduced time inside bellman-ford function for more precise 
+    // execution timing
+    time_start = cuda_gettime();
+    initDistArray<<<N_OF_BLOCKS(V), BLOCK_SIZE>>>(dist, V);
+    cudaDeviceSynchronize();
+
+    // relaxation step must be done V times
+    for (int i = 1; i < V; i++) {
+        relaxationStep<<<N_OF_BLOCKS(E), BLOCK_SIZE>>>(dist, E, edges_gpu);
+    }
+    cudaDeviceSynchronize();
+
+
+    checkNegative<<<N_OF_BLOCKS(E), BLOCK_SIZE>>>(dist, E, edges_gpu, neg_check_gpu);
+    cudaDeviceSynchronize();
+    cudaMemcpy(&neg_check, neg_check_gpu, sizeof(int), cudaMemcpyDeviceToHost);
+    time_end = cuda_gettime();
+
+    *total_time = time_end - time_start;
+
+    cudaFree(edges_gpu);
+    cudaFree(neg_check_gpu);
+    if (neg_check) return NULL;
+    return dist;
+}
+__global__ void initDistArray(int* dist, int V){
+    int i = THREAD_ID;
+    if (i < V) {
+        dist[i] = INT_MAX;
+    }
+
+    if (i == 0) dist[i] = 0;
+}
+
+__global__ void checkNegative(int* dist, int E, Edge* edges, int* neg_check){
+    int i = THREAD_ID;
+    if (i < E) {
+        int u = edges[i].u;
+        int v = edges[i].v;
+        int weight = edges[i].cost;
+
+        if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
+            *neg_check = 1;
+        }
+    }
+}
+
+__global__ void relaxationStep(int* dist, int E, Edge* edges){
+    int i = THREAD_ID;
+    if (i < E) {
+        int u = edges[i].u;
+        int v = edges[i].v;
+        int weight = edges[i].cost;
+
+        if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v]) {
+            __syncthreads();
+            dist[v] = dist[u] + weight;
+        }
+    }
+}
+
+
+Graph *createGraphFromFile(char *filename, int bidirectional) {
+    // read file and create graph
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         printf("Error opening file.\n");
@@ -132,19 +214,33 @@ Graph *createGraphFromFile(char *filename) {
 
     int V, E;
     fscanf(file, "%d %d", &V, &E);
-    Graph *graph = initGraph(V, E);
 
+    // graph memory allocation
+    Graph *graph = (Graph *)malloc(sizeof(Graph));
+    graph->V = V;
+    graph->E = E;
+    if (bidirectional) graph->E = 2 * E;
+    graph->edges = (Edge *)malloc(graph->E * sizeof(Edge));
+
+    // edge definition
     for (int i = 0; i < E; i++) {
-        int u, v, weight;
-        fscanf(file, "%d %d %d", &u, &v, &weight);
-        addEdge(graph, u, v, weight, 1);
+        fscanf(file, "%d %d %d", &graph->edges[i].u, &graph->edges[i].v,
+               &graph->edges[i].cost);
+    }
+
+    if (bidirectional) {
+        for (int i = 0; i < E; i++) {
+            graph->edges[i + E].u = graph->edges[i].v;
+            graph->edges[i + E].v = graph->edges[i].u;
+            graph->edges[i + E].cost = graph->edges[i].cost;
+        }
     }
 
     fclose(file);
     return graph;
 }
 
-void printInfoToFile(char *graph_file, double total_time, int threads) {
+void printInfoToFile(char *graph_file, double total_time) {
     // Define the file path
     char file_path[256];
     snprintf(file_path, sizeof(file_path), "results/cuda.csv");
@@ -163,123 +259,13 @@ void printInfoToFile(char *graph_file, double total_time, int threads) {
         printf("File created successfully!\n");
     }
 
-    fprintf(file, "%s,%d,%.6f\n", graph_file, threads, total_time);
+    fprintf(file, "%s,%.6f\n", graph_file, total_time);
     fclose(file);
 }
 
-int *BellmanFord(Graph *graph, int src) {
-    int V = graph->V;
-    int *dist = (int*)malloc(sizeof(int) * V);
-    if (dist == NULL) {
-        perror("Failed to allocate memory");
-        return NULL;
-    }
-
-    // declaring variables here in order for the scoping to work
-    int i, j, u, v, weight;
-    Node *hd;
-
-    for (i = 0; i < V; i++) {
-        dist[i] = INT_MAX;
-    }
-
-    dist[src] = 0;
-
-    // compute distance array
-    for (i = 1; i < V; i++) {
-        for (j = 0; j < V; j++) {
-            u = j;
-            hd = graph->nodes[u]->next;
-            while (hd != NULL) {
-                v = hd->id;
-                weight = hd->cost;
-
-                if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v]) {
-                    dist[v] = dist[u] + weight;
-                }
-
-                hd = hd->next;
-            }
-        }
-    }
-
-    int neg_check = 0;
-
-    //  if graph still has a shorter path, then there's a negative cycle
-    for (i = 0; i < V; i++) {
-        u = i;
-        hd = graph->nodes[0]->next;
-
-        while (hd != NULL) {
-            int v = hd->id;
-            int weight = hd->cost;
-
-            // If negative cycle is detected, simply return
-            if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
-                printf("Graph contains negative weight cycle\n");
-                neg_check = 1;
-            }
-
-            hd = hd->next;
-        }
-    }
-
-    if (neg_check) return NULL;
-    return dist;
-}
 
 void printArr(int dist[], int n) {
     printf("Vertex  |  Distance from Source\n");
     for (int i = 0; i < n; ++i) printf("%d \t\t %d\n", i, dist[i]);
 }
 
-//
-// Graph handling functions
-//
-//
-
-Graph *initGraph(int V, int E) {
-    Graph *graph = (Graph *)malloc(sizeof(Graph));
-    graph->V = V;
-    graph->E = E;
-    graph->nodes = (Node **)malloc(V * sizeof(Node *));
-
-    for (int i = 0; i < V; i++) {
-        graph->nodes[i] = (Node*)malloc(sizeof(Node));
-        graph->nodes[i]->id = i;
-        graph->nodes[i]->next = NULL;
-    }
-
-    return graph;
-}
-
-void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional) {
-    Node *hd = graph->nodes[src];
-    while (hd->next != NULL) {
-        hd = hd->next;
-    }
-    hd->next = (Node*) malloc(sizeof(Node));
-    hd->next->id = dest;
-    hd->next->cost = cost;
-    hd->next->next = NULL;
-
-    if (bidirectional) addEdge(graph, dest, src, cost, 0);
-}
-
-void printGraph(Graph *graph) {
-    printf("Graph edges:\n");
-    for (int i = 0; i < graph->V; ++i) {
-        printf("info of %d: ", i);
-        printEdgesOfNode(graph->nodes[i]);
-    }
-}
-
-void printEdgesOfNode(Node *node) {
-    Node *hd = node;
-    printf("Node %d is attached to nodes", node->id);
-    while (hd->next != NULL) {
-        hd = hd->next;
-        printf(" %d,", hd->id);
-    }
-    printf(" - END\n");
-}
