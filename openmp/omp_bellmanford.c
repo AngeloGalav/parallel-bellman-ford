@@ -1,8 +1,3 @@
-/////////
-// REMEMBER: QUESTA È L'IMPLEMENTAZIONE PER GRAFO DIREZIONATO
-//
-/////////
-
 #include <limits.h>
 #include <omp.h>
 #include <stdio.h>
@@ -28,6 +23,7 @@ Graph *createGraphFromFile(char *filename, int bidirectional);
 int main(int argc, char *argv[]) {
     char *n_threads_s = argv[1];
     char *graph_file = argv[2];
+    char *debug_flag = argv[3];
 
     // doing a background check on these guys
     if (n_threads_s == NULL) {
@@ -60,12 +56,14 @@ int main(int argc, char *argv[]) {
 
     double total_time = time_end - time_start;
 
-    // printing the distance array (i.e. the result)
-    printArr(dist_result, graph->V);
-    printf("\n");
+    if (debug_flag != NULL) {
+        // printing the distance array (i.e. the result)
+        printArr(dist_result, graph->V);
+    }
 
     printf("Total execution time: %f seconds\n", total_time);
     printInfoToFile(graph_file, total_time, n_threads);
+    printf("\n");
 
     // cleanup
     free(graph->edges);

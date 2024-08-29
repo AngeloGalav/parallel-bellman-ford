@@ -8,3 +8,5 @@ cuda-bf.lib
 results
 omp.csv
 cuda.csv
+project.tar.gz
+execute.sh

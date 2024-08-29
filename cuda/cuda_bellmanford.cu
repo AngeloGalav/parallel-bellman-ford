@@ -1,29 +1,28 @@
+#include <cuda_runtime.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 #include <time.h>
-#include <cuda_runtime.h>
 
-#define BLOCK_SIZE 512 // threads per block
+#define BLOCK_SIZE 512  // threads per block
 #define THREAD_ID (blockIdx.x * blockDim.x + threadIdx.x);
-#define N_OF_BLOCKS(N) ((N + BLOCK_SIZE - 1) / BLOCK_SIZE) // total n of blocks
+#define N_OF_BLOCKS(N) ((N + BLOCK_SIZE - 1) / BLOCK_SIZE)  // total n of blocks
 
 //  Different implementation of cuda_gettime depending on
 //  the OS used by the user, as Windows is not POSIX compliant
 #ifdef _WIN32
 #include <windows.h>
-#define MS_PER_SEC      1000ULL     // MS = milliseconds
-#define US_PER_MS       1000ULL     // US = microseconds
-#define HNS_PER_US      10ULL       // HNS = hundred-nanoseconds (e.g., 1 hns = 100 ns)
-#define NS_PER_US       1000ULL
+#define MS_PER_SEC 1000ULL  // MS = milliseconds
+#define US_PER_MS 1000ULL   // US = microseconds
+#define HNS_PER_US 10ULL    // HNS = hundred-nanoseconds (e.g., 1 hns = 100 ns)
+#define NS_PER_US 1000ULL
 
-#define HNS_PER_SEC     (MS_PER_SEC * US_PER_MS * HNS_PER_US)
-#define NS_PER_HNS      (100ULL)    // NS = nanoseconds
-#define NS_PER_SEC      (MS_PER_SEC * US_PER_MS * NS_PER_US)
+#define HNS_PER_SEC (MS_PER_SEC * US_PER_MS * HNS_PER_US)
+#define NS_PER_HNS (100ULL)  // NS = nanoseconds
+#define NS_PER_SEC (MS_PER_SEC * US_PER_MS * NS_PER_US)
 
-double cuda_gettime(void)
-{
+double cuda_gettime(void) {
     struct timespec ts;
     static LARGE_INTEGER ticksPerSec;
     LARGE_INTEGER ticks;
@@ -39,14 +38,14 @@ double cuda_gettime(void)
     QueryPerformanceCounter(&ticks);
 
     ts.tv_sec = (long)(ticks.QuadPart / ticksPerSec.QuadPart);
-    ts.tv_nsec = (long)(((ticks.QuadPart % ticksPerSec.QuadPart) * NS_PER_SEC) / ticksPerSec.QuadPart);
+    ts.tv_nsec = (long)(((ticks.QuadPart % ticksPerSec.QuadPart) * NS_PER_SEC) /
+                        ticksPerSec.QuadPart);
     return ts.tv_sec + (double)ts.tv_nsec / 1e9;
 }
 #elif __unix__
-double cuda_gettime( void )
-{
+double cuda_gettime(void) {
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts );
+    clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + (double)ts.tv_nsec / 1e9;
 }
 #endif
@@ -62,19 +61,20 @@ typedef struct graph {
     Edge *edges;
 } Graph;
 
-int *BellmanFord(Graph *graph, int src, double* time);
+int *BellmanFord(Graph *graph, int src, double *time);
 void printArr(int dist[], int n);
 Graph *initGraph(int V, int E);
 void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional);
 void printInfoToFile(char *graph_file, double total_time);
 Graph *createGraphFromFile(char *filename, int bidirectional);
 
-__global__ void relaxationStep(int* dist, int E, Edge* edges);
-__global__ void checkNegative(int* dist, int E, Edge* edges, int* neg_check);
-__global__ void initDistArray(int* dist, int V);
+__global__ void relaxationStep(int *dist, int E, Edge *edges);
+__global__ void checkNegative(int *dist, int E, Edge *edges, int *neg_check);
+__global__ void initDistArray(int *dist, int V);
 
 int main(int argc, char *argv[]) {
     char *graph_file = argv[1];
+    char *debug_flag = argv[2];
 
     if (graph_file == NULL) {
         printf("ERROR: No graph file inputted.\n");
@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
     }
 
     // building the graph
-    const char* filename = graph_file;
+    const char *filename = graph_file;
     char graph_filename[100];
     strcpy(graph_filename, filename);
 
@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
     // distance array on GPU
     int *dist_gpu;
     // time "without" memory overhead
-    double* total_time = (double*)malloc(sizeof(double));
+    double *total_time = (double *)malloc(sizeof(double));
     double time_start, time_end;
 
     time_start = cuda_gettime();
@@ -108,18 +108,21 @@ int main(int argc, char *argv[]) {
     if (dist_gpu == NULL) return -1;
 
     // create cpu copy of distance  array
-    int* dist_cpu = (int*) malloc(sizeof(int)*graph->V);
-    cudaMemcpy(dist_cpu, dist_gpu, sizeof(int)*graph->V, cudaMemcpyDeviceToHost);
+    int *dist_cpu = (int *)malloc(sizeof(int) * graph->V);
+    cudaMemcpy(dist_cpu, dist_gpu, sizeof(int) * graph->V,
+               cudaMemcpyDeviceToHost);
 
     // printing the distance array (i.e. the result)
-    printArr(dist_cpu, graph->V);
-    printf("\n");
+    if (debug_flag != NULL) {
+        printArr(dist_cpu, graph->V);
+    }
     cudaFree(dist_gpu);
     free(dist_cpu);
 
     printf("Total execution time: %f seconds\n", *total_time);
     printf("With memory transfer overhead: %f seconds\n", total_time_ov);
     printInfoToFile(graph_file, *total_time);
+    printf("\n");
 
     return 0;
 }
@@ -129,20 +132,21 @@ int *BellmanFord(Graph *graph, int src, double *total_time) {
     int E = graph->E;
 
     // allocate gpu memory
-    Edge* edges_gpu;
+    Edge *edges_gpu;
     cudaMalloc(&edges_gpu, (E * sizeof(Edge)));
-    cudaMemcpy(edges_gpu, graph->edges, E * sizeof(Edge), cudaMemcpyHostToDevice);
+    cudaMemcpy(edges_gpu, graph->edges, E * sizeof(Edge),
+               cudaMemcpyHostToDevice);
 
     int *dist;
     cudaMalloc(&dist, sizeof(int) * V);
 
-    int* neg_check_gpu;
+    int *neg_check_gpu;
     int neg_check;
     cudaMalloc(&neg_check_gpu, sizeof(int));
 
     double time_start, time_end;
 
-    // introduced time inside bellman-ford function for more precise 
+    // introduced time inside bellman-ford function for more precise
     // execution timing
     time_start = cuda_gettime();
     initDistArray<<<N_OF_BLOCKS(V), BLOCK_SIZE>>>(dist, V);
@@ -154,8 +158,8 @@ int *BellmanFord(Graph *graph, int src, double *total_time) {
     }
     cudaDeviceSynchronize();
 
-
-    checkNegative<<<N_OF_BLOCKS(E), BLOCK_SIZE>>>(dist, E, edges_gpu, neg_check_gpu);
+    checkNegative<<<N_OF_BLOCKS(E), BLOCK_SIZE>>>(dist, E, edges_gpu,
+                                                  neg_check_gpu);
     cudaDeviceSynchronize();
     cudaMemcpy(&neg_check, neg_check_gpu, sizeof(int), cudaMemcpyDeviceToHost);
     time_end = cuda_gettime();
@@ -167,7 +171,7 @@ int *BellmanFord(Graph *graph, int src, double *total_time) {
     if (neg_check) return NULL;
     return dist;
 }
-__global__ void initDistArray(int* dist, int V){
+__global__ void initDistArray(int *dist, int V) {
     int i = THREAD_ID;
     if (i < V) {
         dist[i] = INT_MAX;
@@ -176,7 +180,7 @@ __global__ void initDistArray(int* dist, int V){
     if (i == 0) dist[i] = 0;
 }
 
-__global__ void checkNegative(int* dist, int E, Edge* edges, int* neg_check){
+__global__ void checkNegative(int *dist, int E, Edge *edges, int *neg_check) {
     int i = THREAD_ID;
     if (i < E) {
         int u = edges[i].u;
@@ -189,7 +193,7 @@ __global__ void checkNegative(int* dist, int E, Edge* edges, int* neg_check){
     }
 }
 
-__global__ void relaxationStep(int* dist, int E, Edge* edges){
+__global__ void relaxationStep(int *dist, int E, Edge *edges) {
     int i = THREAD_ID;
     if (i < E) {
         int u = edges[i].u;
@@ -202,7 +206,6 @@ __global__ void relaxationStep(int* dist, int E, Edge* edges){
         }
     }
 }
-
 
 Graph *createGraphFromFile(char *filename, int bidirectional) {
     // read file and create graph
@@ -263,9 +266,7 @@ void printInfoToFile(char *graph_file, double total_time) {
     fclose(file);
 }
 
-
 void printArr(int dist[], int n) {
     printf("Vertex  |  Distance from Source\n");
     for (int i = 0; i < n; ++i) printf("%d \t\t %d\n", i, dist[i]);
 }
-
