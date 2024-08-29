@@ -1,29 +1,27 @@
-/////////
-// REMEMBER: QUESTA È L'IMPLEMENTAZIONE PER GRAFO DIREZIONATO
-//
-/////////
-
 #include <limits.h>
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct edge {
-    int u;
-    int v;
+typedef struct node {
+    int id;
     int cost;
-} Edge;
+    struct node *next;
+} Node;
 
 typedef struct graph {
     int V, E;
-    Edge *edges;
+    Node **nodes;
 } Graph;
 
 int *BellmanFord(Graph *graph, int src);
 void printArr(int dist[], int n);
 Graph *initGraph(int V, int E);
+void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional);
 void printInfoToFile(char *graph_file, double total_time, int threads);
-Graph *createGraphFromFile(char *filename, int bidirectional);
+Graph *createGraphFromFile(char *filename);
+void printGraph(Graph *graph);
+void printEdgesOfNode(Node *node);
 
 int main(int argc, char *argv[]) {
     char *n_threads_s = argv[1];
@@ -45,7 +43,7 @@ int main(int argc, char *argv[]) {
     omp_set_num_threads(n_threads);
 
     // generating the graph
-    Graph *graph = createGraphFromFile(graph_file, 0);
+    Graph *graph = createGraphFromFile(graph_file);
     if (graph == NULL) {
         printf("Error creating graph\n");
         return -1;
@@ -61,21 +59,18 @@ int main(int argc, char *argv[]) {
     double total_time = time_end - time_start;
 
     // printing the distance array (i.e. the result)
-    printArr(dist_result, graph->V);
-    printf("\n");
+    // if (dist_result == NULL) return -1;
+    // printArr(dist_result, graph->V);
+
+    // printf("\n");
 
     printf("Total execution time: %f seconds\n", total_time);
     printInfoToFile(graph_file, total_time, n_threads);
 
-    // cleanup
-    free(graph->edges);
-    free(graph);
-
     return 0;
 }
 
-Graph *createGraphFromFile(char *filename, int bidirectional) {
-    // read file and create graph
+Graph *createGraphFromFile(char *filename) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         printf("Error opening file.\n");
@@ -84,26 +79,12 @@ Graph *createGraphFromFile(char *filename, int bidirectional) {
 
     int V, E;
     fscanf(file, "%d %d", &V, &E);
+    Graph *graph = initGraph(V, E);
 
-    // graph memory allocation
-    Graph *graph = (Graph *)malloc(sizeof(Graph));
-    graph->V = V;
-    graph->E = E;
-    if (bidirectional) graph->E = 2 * E;
-    graph->edges = (Edge *)malloc(graph->E * sizeof(Edge));
-
-    // edge definition
     for (int i = 0; i < E; i++) {
-        fscanf(file, "%d %d %d", &graph->edges[i].u, &graph->edges[i].v,
-               &graph->edges[i].cost);
-    }
-
-    if (bidirectional) {
-        for (int i = 0; i < E; i++) {
-            graph->edges[i + E].u = graph->edges[i].v;
-            graph->edges[i + E].v = graph->edges[i].u;
-            graph->edges[i + E].cost = graph->edges[i].cost;
-        }
+        int u, v, weight;
+        fscanf(file, "%d %d %d", &u, &v, &weight);
+        addEdge(graph, u, v, weight, 1);
     }
 
     fclose(file);
@@ -135,7 +116,6 @@ void printInfoToFile(char *graph_file, double total_time, int threads) {
 
 int *BellmanFord(Graph *graph, int src) {
     int V = graph->V;
-    int E = graph->E;
     int *dist = (int *)malloc(sizeof(int) * V);
     if (dist == NULL) {
         perror("Failed to allocate memory");
@@ -143,8 +123,9 @@ int *BellmanFord(Graph *graph, int src) {
     }
 
     // declaring variables here in order for the scoping to work
-    int i, u, v, weight;
-    int j = 0;
+    int i, j, u, v, weight;
+    Node *hd;
+
 #pragma omp parallel for schedule(static)
     for (i = 0; i < V; i++) {
         dist[i] = INT_MAX;
@@ -154,15 +135,21 @@ int *BellmanFord(Graph *graph, int src) {
 
     // compute distance array
     for (i = 1; i < V; i++) {
-#pragma omp parallel for private(u, v, weight, j) shared(dist) schedule(static)
-        for (j = 0; j < E; j++) {
-            u = graph->edges[j].u;
-            v = graph->edges[j].v;
-            weight = graph->edges[j].cost;
+#pragma omp parallel for private(u, v, weight, j, hd) shared(dist) \
+    schedule(static)
+        for (j = 0; j < V; j++) {
+            u = j;
+            hd = graph->nodes[u]->next;
+            while (hd != NULL) {
+                v = hd->id;
+                weight = hd->cost;
 
-            if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v]) {
+                if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v]) {
 #pragma omp atomic write
-                dist[v] = dist[u] + weight;
+                    dist[v] = dist[u] + weight;
+                }
+
+                hd = hd->next;
             }
         }
     }
@@ -170,17 +157,23 @@ int *BellmanFord(Graph *graph, int src) {
     int neg_check = 0;
 
 // if graph still has a shorter path, then there's a negative cycle
-#pragma omp parallel for private(u, v, weight, i) schedule(static)
+#pragma omp parallel for private(u, v, weight, i, hd) schedule(static)
     for (i = 0; i < V; i++) {
-        u = graph->edges[j].u;
-        v = graph->edges[j].v;
-        weight = graph->edges[j].cost;
+        u = i;
+        hd = graph->nodes[0]->next;
 
-        // If negative cycle is detected, simply return
-        if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
-            printf("Graph contains negative weight cycle\n");
+        while (hd != NULL) {
+            int v = hd->id;
+            int weight = hd->cost;
+
+            // If negative cycle is detected, simply return
+            if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
+                printf("Graph contains negative weight cycle\n");
 #pragma omp atomic write
-            neg_check = 1;
+                neg_check = 1;
+            }
+
+            hd = hd->next;
         }
     }
 
@@ -191,4 +184,55 @@ int *BellmanFord(Graph *graph, int src) {
 void printArr(int dist[], int n) {
     printf("Vertex  |  Distance from Source\n");
     for (int i = 0; i < n; ++i) printf("%d \t\t %d\n", i, dist[i]);
+}
+
+//
+// Graph handling functions
+//
+//
+
+Graph *initGraph(int V, int E) {
+    Graph *graph = (Graph *)malloc(sizeof(Graph));
+    graph->V = V;
+    graph->E = E;
+    graph->nodes = (Node **)malloc(V * sizeof(Node *));
+
+    for (int i = 0; i < V; i++) {
+        graph->nodes[i] = (Node *)malloc(sizeof(Node));
+        graph->nodes[i]->id = i;
+        graph->nodes[i]->next = NULL;
+    }
+
+    return graph;
+}
+
+void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional) {
+    Node *hd = graph->nodes[src];
+    while (hd->next != NULL) {
+        hd = hd->next;
+    }
+    hd->next = (Node *)malloc(sizeof(Node));
+    hd->next->id = dest;
+    hd->next->cost = cost;
+    hd->next->next = NULL;
+
+    if (bidirectional) addEdge(graph, dest, src, cost, 0);
+}
+
+void printGraph(Graph *graph) {
+    printf("Graph edges:\n");
+    for (int i = 0; i < graph->V; ++i) {
+        printf("info of %d: ", i);
+        printEdgesOfNode(graph->nodes[i]);
+    }
+}
+
+void printEdgesOfNode(Node *node) {
+    Node *hd = node;
+    printf("Node %d is attached to nodes", node->id);
+    while (hd->next != NULL) {
+        hd = hd->next;
+        printf(" %d,", hd->id);
+    }
+    printf(" - END\n");
 }
