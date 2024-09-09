@@ -110,6 +110,9 @@ int main(int argc, char *argv[]) {
     double *total_time = (double *)malloc(sizeof(double));
     double time_start, time_end;
 
+    if (mode) printf("Running in parallel mode\n");
+    else printf("Runnning in one-threaded mode.\n");
+
     time_start = cuda_gettime();
     dist_gpu = BellmanFord(graph, 0, total_time);
     cudaDeviceSynchronize();
@@ -320,7 +323,7 @@ void printInfoToFile(char *graph_file, double total_time) {
                 file_path);
 
         if (mode) snprintf(file_path, sizeof(file_path), "cuda.csv");
-        else snprintf(file_path, sizeof(file_path), "results/cuda_serial.csv");
+        else snprintf(file_path, sizeof(file_path), "cuda_serial.csv");
 
         file = fopen(file_path, "a");
         if (!file) {
