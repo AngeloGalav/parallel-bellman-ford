@@ -68,13 +68,25 @@ void addEdge(Graph *graph, int src, int dest, int cost, int bidirectional);
 void printInfoToFile(char *graph_file, double total_time);
 Graph *createGraphFromFile(char *filename, int bidirectional);
 
+// single threaded functions in cuda
+__global__ void initDistArray(int *dist, int V, int src);
 __global__ void relaxationStep(int *dist, int E, Edge *edges);
 __global__ void checkNegative(int *dist, int E, Edge *edges, int *neg_check);
-__global__ void initDistArray(int *dist, int V);
+// single threaded functions in cuda
+__global__ void oneThreadInitDistArray(int *dist, int V, int src);
+__global__ void oneThreadRelaxationStep(int *dist, int E, Edge *edges);
+__global__ void oneThreadCheckNegative(int *dist, int E, Edge *edges, int *neg_check);
+
+int mode; // 1 is parallel, 0 is serial
 
 int main(int argc, char *argv[]) {
     char *graph_file = argv[1];
-    char *debug_flag = argv[2];
+    char *exec_mode = argv[2];
+    char *debug_flag = argv[3];
+
+    if (exec_mode != NULL) {
+        mode = atoi(exec_mode);
+    } else mode = 1;
 
     if (graph_file == NULL) {
         printf("ERROR: No graph file inputted.\n");
@@ -149,18 +161,34 @@ int *BellmanFord(Graph *graph, int src, double *total_time) {
     // introduced time inside bellman-ford function for more precise
     // execution timing
     time_start = cuda_gettime();
-    initDistArray<<<N_OF_BLOCKS(V), BLOCK_SIZE>>>(dist, V);
-    cudaDeviceSynchronize();
 
-    // relaxation step must be done V times
-    for (int i = 1; i < V; i++) {
-        relaxationStep<<<N_OF_BLOCKS(E), BLOCK_SIZE>>>(dist, E, edges_gpu);
+    // parallel code
+    if (mode) {
+        initDistArray<<<N_OF_BLOCKS(V), BLOCK_SIZE>>>(dist, V, src);
+        cudaDeviceSynchronize();
+
+        // relaxation step must be done V times
+        for (int i = 1; i < V; i++) {
+            relaxationStep<<<N_OF_BLOCKS(E), BLOCK_SIZE>>>(dist, E, edges_gpu);
+        }
+        cudaDeviceSynchronize();
+
+        checkNegative<<<N_OF_BLOCKS(E), BLOCK_SIZE>>>(dist, E, edges_gpu, neg_check_gpu);
+        cudaDeviceSynchronize();
     }
-    cudaDeviceSynchronize();
+    else // serial mode
+    {
+        oneThreadInitDistArray<<<1, 1>>>(dist, V, src);
+        cudaDeviceSynchronize();
 
-    checkNegative<<<N_OF_BLOCKS(E), BLOCK_SIZE>>>(dist, E, edges_gpu,
-                                                  neg_check_gpu);
-    cudaDeviceSynchronize();
+        for (int i = 1; i < V; i++) {
+            oneThreadRelaxationStep<<<1, 1>>>(dist, E, edges_gpu);
+        }
+        cudaDeviceSynchronize();
+
+        oneThreadCheckNegative<<<1, 1>>>(dist, E, edges_gpu, neg_check_gpu);
+        cudaDeviceSynchronize();
+    }
     cudaMemcpy(&neg_check, neg_check_gpu, sizeof(int), cudaMemcpyDeviceToHost);
     time_end = cuda_gettime();
 
@@ -171,13 +199,15 @@ int *BellmanFord(Graph *graph, int src, double *total_time) {
     if (neg_check) return NULL;
     return dist;
 }
-__global__ void initDistArray(int *dist, int V) {
+
+// parallel functions
+__global__ void initDistArray(int *dist, int V, int src) {
     int i = THREAD_ID;
     if (i < V) {
         dist[i] = INT_MAX;
     }
 
-    if (i == 0) dist[i] = 0;
+    if (i == src) dist[i] = 0;
 }
 
 __global__ void checkNegative(int *dist, int E, Edge *edges, int *neg_check) {
@@ -206,6 +236,40 @@ __global__ void relaxationStep(int *dist, int E, Edge *edges) {
         }
     }
 }
+
+// single thread functions
+__global__ void oneThreadInitDistArray(int *dist, int V, int src) {
+    for (int i = 0; i < V; i++) {
+        dist[i] = INT_MAX;
+    }
+
+    dist[src] = 0;
+}
+
+__global__ void oneThreadRelaxationStep(int *dist, int E, Edge *edges) {
+    for (int i = 0; i < E; i++){
+        int u = edges[i].u;
+        int v = edges[i].v;
+        int weight = edges[i].cost;
+
+        if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v]) {
+            dist[v] = dist[u] + weight;
+        }
+    }
+}
+
+__global__ void oneThreadCheckNegative(int *dist, int E, Edge *edges, int *neg_check) {
+    for (int i = 0; i < E; i++){
+        int u = edges[i].u;
+        int v = edges[i].v;
+        int weight = edges[i].cost;
+
+        if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
+            *neg_check = 1;
+        }
+    }
+}
+
 
 Graph *createGraphFromFile(char *filename, int bidirectional) {
     // read file and create graph
@@ -246,14 +310,18 @@ Graph *createGraphFromFile(char *filename, int bidirectional) {
 void printInfoToFile(char *graph_file, double total_time) {
     // Define the file path
     char file_path[256];
-    snprintf(file_path, sizeof(file_path), "results/cuda.csv");
+    if (mode) snprintf(file_path, sizeof(file_path), "results/cuda.csv");
+    else snprintf(file_path, sizeof(file_path), "results/cuda_serial.csv");
 
     FILE *file = fopen(file_path, "a");
     if (!file) {
         fprintf(stderr,
                 "Failed to open file: %s, creating file on WD instead...\n",
                 file_path);
-        snprintf(file_path, sizeof(file_path), "cuda.csv");
+
+        if (mode) snprintf(file_path, sizeof(file_path), "cuda.csv");
+        else snprintf(file_path, sizeof(file_path), "results/cuda_serial.csv");
+
         file = fopen(file_path, "a");
         if (!file) {
             fprintf(stderr, "Failed to open file again, aborting.");

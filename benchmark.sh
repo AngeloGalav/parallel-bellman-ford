@@ -72,11 +72,25 @@ done
 
 # CUSA processes
 echo "====== STARTING CUDA TESTS ======"
+
+echo "> Parallel CUDA"
 for graph_file in $graph_files; do
   if [ $debug -eq 1 ]; then
     output_path="results/sanity/cuda_${graph_file}.txt"
     echo "Running cuda-bf on $graph_file, outputting to $output_path"
-    timeout ${timeout} ./cuda-bf "graphs/$graph_file" -d > "$output_path" 2>&1
+    timeout ${timeout} ./cuda-bf "graphs/$graph_file" -d 1 > "$output_path" 2>&1
+  else
+    echo "Running cuda-bf on $graph_file"
+    timeout ${timeout} ./cuda-bf "graphs/$graph_file"
+  fi
+done
+
+echo "> Serial CUDA"
+for graph_file in $graph_files; do
+  if [ $debug -eq 1 ]; then
+    output_path="results/sanity/cuda_${graph_file}.txt"
+    echo "Running cuda-bf on $graph_file, outputting to $output_path"
+    timeout ${timeout} ./cuda-bf "graphs/$graph_file" -d 0 > "$output_path" 2>&1
   else
     echo "Running cuda-bf on $graph_file"
     timeout ${timeout} ./cuda-bf "graphs/$graph_file"
