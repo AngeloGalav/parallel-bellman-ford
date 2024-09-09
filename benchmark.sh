@@ -48,6 +48,9 @@ threads=(1 2 3 4 5 6 7 8 9 10 16)
 
 graph_files=$(ls graphs/)
 
+# OMP processes
+
+echo "====== STARTING OMP TESTS ======"
 for n in "${threads[@]}"; do
   for graph_file in $graph_files; do
     if [ $debug -eq 1 ]; then
@@ -67,13 +70,15 @@ for n in "${threads[@]}"; do
   done
 done
 
-# for graph_file in $graph_files; do
-#   if [ $debug -eq 1 ]; then
-#     output_path="results/sanity/cuda_${graph_file}.txt"
-#     echo "Running cuda-bf on $graph_file, outputting to $output_path"
-#     timeout ${timeout} ./cuda-bf "graphs/$graph_file" -d > "$output_path" 2>&1
-#   else
-#     echo "Running cuda-bf on $graph_file"
-#     timeout ${timeout} ./cuda-bf "graphs/$graph_file"
-#   fi
-# done
+# CUSA processes
+echo "====== STARTING CUDA TESTS ======"
+for graph_file in $graph_files; do
+  if [ $debug -eq 1 ]; then
+    output_path="results/sanity/cuda_${graph_file}.txt"
+    echo "Running cuda-bf on $graph_file, outputting to $output_path"
+    timeout ${timeout} ./cuda-bf "graphs/$graph_file" -d > "$output_path" 2>&1
+  else
+    echo "Running cuda-bf on $graph_file"
+    timeout ${timeout} ./cuda-bf "graphs/$graph_file"
+  fi
+done

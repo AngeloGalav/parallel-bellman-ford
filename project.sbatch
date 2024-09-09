@@ -5,9 +5,9 @@
 #SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=4
-#SBATCH --gres=gpu:1
 #SBATCH --output=output_%j.txt
 #SBATCH --error=error_%j.txt
+#SBATCH --gres=gpu:1
 
 
 # compile openmp

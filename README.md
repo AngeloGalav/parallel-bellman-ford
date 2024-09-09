@@ -34,5 +34,6 @@ graph_maker.py [-h] [-v NODES] [-e EDGES] [-neg | --negative | --no-negative]
 ## TODO:
 - [ ] Rewrite graphs
 - [ ] Launch benchmark on remote machine
-- [ ] Write plt scripts
+- [ ] Add serial cuda(?)
+- [x] Write plt scripts
 - [ ] Write report
