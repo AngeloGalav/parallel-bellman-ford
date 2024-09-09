@@ -47,13 +47,17 @@ def plot_graph(data, label, output_folder, color):
             # Sort the data by the number of threads
             values.sort(key=lambda x: x[0])
             threads, times = zip(*values)
-            
+            threads = list(threads)
             # Plotting
             plt.figure()
-            plt.plot(threads, times, marker='o', color=color)
+            plt.plot(list(threads), times, marker='o', color=color)
+            plt.xscale('log')
+            plt.xticks(list(threads), labels=[str(x) for x in threads])  # 
             plt.xlabel('Number of Threads')
             plt.ylabel('Time (s)')
             plt.title(f'OMP: Performance of Graph with {graph_configs[graph_file][0]} nodes')
+            plt.tick_params(axis='x', which='minor', length=0)  # Explicitly removing minor ticks if needed
+
             plt.grid(True)
             
             # Ensure directory exists
@@ -91,7 +95,7 @@ def plot_graph_cuda(graph_cfg, time_data, save_folder):
     full_path = os.path.join(save_folder, "CUDA.png")
 
     plt.savefig(full_path)
-    print(f"Graph saved to {full_path}")
+    plt.close()
 
 graph_configs = get_graph_config("graphs")
 

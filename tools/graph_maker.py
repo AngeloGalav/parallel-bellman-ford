@@ -14,6 +14,9 @@ parser.add_argument('-neg', "--negative", default=False, action=argparse.Boolean
 
 args = parser.parse_args()
 
+output_folder = "graphs"
+os.makedirs(output_folder, exist_ok=True)
+
 # weight range
 range_w = (0, 300)
 if args.negative : range_w = (-300, 300)
@@ -36,11 +39,11 @@ def create_graph_file(V, E) :
     base_filename = 'graph.txt'
     counter = 0
 
-    while os.path.exists(filename):
+    while os.path.exists(os.path.join(output_folder,filename)):
         filename = f"{base_filename.rsplit('.', 1)[0]}_{counter}.txt"
         counter += 1
 
-    with open(filename, 'w') as file:
+    with open(os.path.join(output_folder, filename), 'w') as file:
         file.write(f"{V} {E}\n")
         for u, v, data in G.edges(data=True):
             file.write(f"{u} {v} {data['weight']}\n")
