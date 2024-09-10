@@ -234,8 +234,7 @@ __global__ void relaxationStep(int *dist, int E, Edge *edges) {
         int weight = edges[i].cost;
 
         if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v]) {
-            __syncthreads();
-            dist[v] = dist[u] + weight;
+            atomicMin(&dist[v], dist[u] + weight);
         }
     }
 }
