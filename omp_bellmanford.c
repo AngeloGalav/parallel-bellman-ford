@@ -158,9 +158,16 @@ int *BellmanFord(Graph *graph, int src) {
             v = graph->edges[j].v;
             weight = graph->edges[j].cost;
 
-            if (dist[u] != INT_MAX && (dist[u] + weight) < dist[v]) {
-#pragma omp atomic write
-                dist[v] = dist[u] + weight;
+            if (dist[u] != INT_MAX && (dist[u] + weight < dist[v])) {
+#pragma omp critical
+                {
+                    // having a second check here allows to execute the operation
+                    // only if dist[v] is actually LESS, even if another thread
+                    // already modified it.
+                    if (dist[u] + weight < dist[v]) {
+                        dist[v] = dist[u] + weight;
+                    }
+                }
             }
         }
     }
