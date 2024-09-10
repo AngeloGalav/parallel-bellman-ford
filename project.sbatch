@@ -11,10 +11,10 @@
 
 
 # compile openmp
-gcc -o omp-bf openmp/omp_bellmanford.c -fopenmp -Wall
+gcc -o omp-bf omp_bellmanford.c -fopenmp -Wall
 
 # compile cuda
-nvcc -o cuda-bf cuda/cuda_bellmanford.cu
+nvcc -o cuda-bf cuda_bellmanford.cu
 
 # complete a benchmark run on everything
 ./benchmark.sh -d -t 5m

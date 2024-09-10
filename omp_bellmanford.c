@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     omp_set_num_threads(n_threads);
 
     // generating the graph
-    Graph *graph = createGraphFromFile(graph_file, 0);
+    Graph *graph = createGraphFromFile(graph_file, 1);
     if (graph == NULL) {
         printf("Error creating graph\n");
         return -1;
@@ -176,7 +176,6 @@ int *BellmanFord(Graph *graph, int src) {
 
         // If negative cycle is detected, simply return
         if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
-            printf("Graph contains negative weight cycle\n");
 #pragma omp atomic write
             neg_check = 1;
         }

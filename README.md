@@ -8,15 +8,16 @@ From [Wikipedia](https://en.wikipedia.org/wiki/Bellman%E2%80%93Ford_algorithm):
 ## Usage
 - OpenMP
 ```
-./omp-bf [threads] [graph_file]
+./omp-bf [threads] [graph_file] [-d DEBUG]
 ```
 - CUDA
 ```
-./cuda-bf [graph_file]
+./cuda-bf [graph_file] [mode] [-d DEBUG]
 ```
+The parameter `mode` can be set to 0 to run the program on a single-thread, otherwise it is run in parallel.
 
 ## Compiling
-On both Linux and Windows, you can use the following commands to compile the project:
+On both Linux and Windows, you can use `./compile.sh` or the following commands to compile the project:
 - OpeMP
 ```
 gcc -o omp-bf openmp/omp_bellmanford.c -fopenmp -Wall
@@ -25,15 +26,14 @@ gcc -o omp-bf openmp/omp_bellmanford.c -fopenmp -Wall
 ```
 nvcc -o cuda-bf cuda/cuda_bellmanford.cu
 ```
-## Graph Maker Tool
+
+## Tools
 Graph Maker:
 ```
-graph_maker.py [-h] [-v NODES] [-e EDGES] [-neg | --negative | --no-negative]
+python graph_maker.py [-h] [-v NODES] [-e EDGES] [-neg | --negative | --no-negative]
 ```
 
-## TODO:
-- [x] Rewrite graphs
-- [x] Launch benchmark on remote machine
-- [x] Add serial cuda
-- [x] Write plt scripts
-- [ ] Write report
+Plotter:
+```
+python tools/plotting/plotter.py
+```

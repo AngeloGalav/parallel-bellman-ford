@@ -69,13 +69,13 @@ for n in "${threads[@]}"; do
   done
 done
 
-# CUSA processes
+# CUDA processes
 echo "====== STARTING CUDA TESTS ======"
 
 echo "> Parallel CUDA"
 for graph_file in $graph_files; do
   if [ $debug -eq 1 ]; then
-    output_path="results/sanity/cuda_${graph_file}.txt"
+    output_path="results/sanity/cuda_parallel_${graph_file}.txt"
     echo "Running cuda-bf parallel on $graph_file, outputting to $output_path"
     timeout ${timeout} ./cuda-bf "graphs/$graph_file" 1 -d > "$output_path" 2>&1
   else
@@ -87,7 +87,7 @@ done
 echo "> Serial CUDA"
 for graph_file in $graph_files; do
   if [ $debug -eq 1 ]; then
-    output_path="results/sanity/cuda_${graph_file}.txt"
+    output_path="results/sanity/cuda_serial_${graph_file}.txt"
     echo "Running cuda-bf serial on $graph_file, outputting to $output_path"
     timeout ${timeout} ./cuda-bf "graphs/$graph_file" 0 -d > "$output_path" 2>&1
   else

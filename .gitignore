@@ -12,3 +12,4 @@ project.tar.gz
 fresh_results.tar.gz
 execute.sh
 final_step.sh
+compile.sh
