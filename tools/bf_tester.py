@@ -6,17 +6,14 @@ parser.add_argument("-g", "--graph", type=str, help="Graph filename", required=F
 args = parser.parse_args()
 
 def bellman_ford(vertices, edges, start):
-    # Initialize distance to all vertices as infinite and distance to start as 0
     distance = [float('inf')] * vertices
     distance[start] = 0
 
-    # Relax edges |V| - 1 times
     for _ in range(vertices - 1):
         for u, v, w in edges:
             if distance[u] != float('inf') and distance[u] + w < distance[v]:
                 distance[v] = distance[u] + w
 
-    # Check for negative-weight cycles
     for u, v, w in edges:
         if distance[u] != float('inf') and distance[u] + w < distance[v]:
             print("Graph contains negative weight cycle")
