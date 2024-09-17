@@ -56,10 +56,10 @@ for n in "${threads[@]}"; do
       output_path="results/sanity/omp_${graph_file}.txt"
       echo "Running omp-bf on $graph_file with $n threads, outputting to $output_path"
       echo "omp-bf with $n threads" >> "$output_path"
-      timeout ${timeout} ./omp-bf "$n" "graphs/$graph_file" -d >> "$output_path" 2>&1
+      timeout ${timeout} ./omp-bf "$n" "graphs/$graph_file" -b -d >> "$output_path" 2>&1
     else
       echo "Running omp-bf on $graph_file with $n threads"
-      timeout ${timeout} ./omp-bf "$n" "graphs/$graph_file"
+      timeout ${timeout} ./omp-bf "$n" "graphs/$graph_file" -b
     fi
 
     if [ $? -eq 124 ]; then
@@ -77,10 +77,10 @@ for graph_file in $graph_files; do
   if [ $debug -eq 1 ]; then
     output_path="results/sanity/cuda_parallel_${graph_file}.txt"
     echo "Running cuda-bf parallel on $graph_file, outputting to $output_path"
-    timeout ${timeout} ./cuda-bf "graphs/$graph_file" 1 -d > "$output_path" 2>&1
+    timeout ${timeout} ./cuda-bf "graphs/$graph_file" 1 -b -d > "$output_path" 2>&1
   else
     echo "Running cuda-bf parallel on $graph_file"
-    timeout ${timeout} ./cuda-bf "graphs/$graph_file"
+    timeout ${timeout} ./cuda-bf "graphs/$graph_file" 1 -b
   fi
 done
 
@@ -89,9 +89,9 @@ for graph_file in $graph_files; do
   if [ $debug -eq 1 ]; then
     output_path="results/sanity/cuda_serial_${graph_file}.txt"
     echo "Running cuda-bf serial on $graph_file, outputting to $output_path"
-    timeout ${timeout} ./cuda-bf "graphs/$graph_file" 0 -d > "$output_path" 2>&1
+    timeout ${timeout} ./cuda-bf "graphs/$graph_file" 0 -b -d > "$output_path" 2>&1
   else
     echo "Running cuda-bf serial on $graph_file"
-    timeout ${timeout} ./cuda-bf "graphs/$graph_file"
+    timeout ${timeout} ./cuda-bf "graphs/$graph_file" 0 -b
   fi
 done

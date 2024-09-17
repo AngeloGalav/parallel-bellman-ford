@@ -77,20 +77,26 @@ __global__ void oneThreadInitDistArray(int *dist, int V, int src);
 __global__ void oneThreadRelaxationStep(int *dist, int E, Edge *edges);
 __global__ void oneThreadCheckNegative(int *dist, int E, Edge *edges, int *neg_check);
 
-int mode; // 1 is parallel, 0 is serial
+int mode = 1; // 1 is parallel, 0 is serial
 
 int main(int argc, char *argv[]) {
-    char *graph_file = argv[1];
-    char *exec_mode = argv[2];
-    char *debug_flag = argv[3];
+    // console args handling
+    int bidirectional = 0, debug_flag = 0;
+    char *graph_file = NULL;
+    int i = 1;
 
-    if (exec_mode != NULL) {
-        mode = atoi(exec_mode);
-    } else mode = 1;
-
-    if (graph_file == NULL) {
-        printf("ERROR: No graph file inputted.\n");
-        return -1;
+    while (i < argc) {
+        if (strcmp(argv[i], "-b") == 0) {
+            bidirectional = 1;
+        } else if (strcmp(argv[i], "-d") == 0) {
+            debug_flag = 1;
+        } else if (i == 1) {
+            graph_file = argv[i];
+        } else if (i == 2) {
+            mode = atoi(argv[i]);
+            if (mode != 0) mode = 1;
+        }
+        i++;
     }
 
     // building the graph
@@ -98,7 +104,7 @@ int main(int argc, char *argv[]) {
     char graph_filename[100];
     strcpy(graph_filename, filename);
 
-    Graph *graph = createGraphFromFile(graph_filename, 1);
+    Graph *graph = createGraphFromFile(graph_filename, bidirectional);
     if (graph == NULL) {
         printf("Error creating graph\n");
         return -1;
@@ -120,7 +126,14 @@ int main(int argc, char *argv[]) {
 
     // time with memory overhead
     double total_time_ov = time_end - time_start;
-    if (dist_gpu == NULL) return -1;
+
+    // if negative edges, simply return NULL
+    if (dist_gpu == NULL)
+    {
+        printf("Graph has negative edges.\n");
+        return -1;
+
+    }
 
     // create cpu copy of distance  array
     int *dist_cpu = (int *)malloc(sizeof(int) * graph->V);
@@ -128,9 +141,10 @@ int main(int argc, char *argv[]) {
                cudaMemcpyDeviceToHost);
 
     // printing the distance array (i.e. the result)
-    if (debug_flag != NULL) {
+    if (debug_flag) {
         printArr(dist_cpu, graph->V);
     }
+
     cudaFree(dist_gpu);
     free(dist_cpu);
 
@@ -199,7 +213,10 @@ int *BellmanFord(Graph *graph, int src, double *total_time) {
 
     cudaFree(edges_gpu);
     cudaFree(neg_check_gpu);
-    if (neg_check) return NULL;
+    if (neg_check) {
+        printf("Found negative graph...\n");
+        return NULL;
+    }
     return dist;
 }
 

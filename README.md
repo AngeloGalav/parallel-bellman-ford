@@ -8,11 +8,11 @@ From [Wikipedia](https://en.wikipedia.org/wiki/Bellman%E2%80%93Ford_algorithm):
 ## Usage
 - OpenMP
 ```
-./omp-bf [threads] [graph_file] [-d DEBUG]
+./omp-bf [threads] [graph_file] [-b BIDIRECTIONAL] [-d DEBUG]
 ```
 - CUDA
 ```
-./cuda-bf [graph_file] [mode] [-d DEBUG]
+./cuda-bf [graph_file] [mode] [-b BIDIRECTIONAL] [-d DEBUG]
 ```
 The parameter `mode` can be set to 0 to run the program on a single-thread, otherwise it is run in parallel.
 
@@ -30,7 +30,7 @@ nvcc -o cuda-bf cuda/cuda_bellmanford.cu
 ## Tools
 Graph Maker:
 ```
-python graph_maker.py [-h] [-v NODES] [-e EDGES] [-neg | --negative | --no-negative]
+python tools/graph_maker.py [-h] [-v NODES] [-e EDGES] [-neg | --negative | --no-negative]
 ```
 
 Plotter:

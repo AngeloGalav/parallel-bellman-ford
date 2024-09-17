@@ -2,6 +2,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct edge {
     int u;
@@ -21,27 +22,30 @@ void printInfoToFile(char *graph_file, double total_time, int threads);
 Graph *createGraphFromFile(char *filename, int bidirectional);
 
 int main(int argc, char *argv[]) {
-    char *n_threads_s = argv[1];
-    char *graph_file = argv[2];
-    char *debug_flag = argv[3];
 
-    // doing a background check on these guys
-    if (n_threads_s == NULL) {
-        printf("ERROR: No threads inputted.\n");
-        return -1;
-    }
+    // console args handling
+    int bidirectional = 0, debug_flag = 0, n_threads = 1;
+    char *graph_file = NULL;
+    int i = 1;
 
-    if (graph_file == NULL) {
-        printf("ERROR: No graph file inputted.\n");
-        return -1;
+    while (i < argc) {
+        if (strcmp(argv[i], "-b") == 0) {
+            bidirectional = 1;
+        } else if (strcmp(argv[i], "-d") == 0) {
+            debug_flag = 1;
+        } else if (i == 1) {
+            n_threads = atoi(argv[i]);
+        } else if (i == 2) {
+            graph_file = argv[i];
+        }
+        i++;
     }
 
     // setting the number of threads
-    int n_threads = atoi(n_threads_s);
     omp_set_num_threads(n_threads);
 
     // generating the graph
-    Graph *graph = createGraphFromFile(graph_file, 1);
+    Graph *graph = createGraphFromFile(graph_file, bidirectional);
     if (graph == NULL) {
         printf("Error creating graph\n");
         return -1;
@@ -49,14 +53,16 @@ int main(int argc, char *argv[]) {
 
     double time_start, time_end;
 
-    time_start = omp_get_wtime();
     int *dist_result;
+    time_start = omp_get_wtime();
     dist_result = BellmanFord(graph, 0);
     time_end = omp_get_wtime();
 
     double total_time = time_end - time_start;
 
-    if (debug_flag != NULL) {
+    if (!dist_result) printf("Graph had negative edges\n");
+
+    if (debug_flag && dist_result != NULL) {
         // printing the distance array (i.e. the result)
         printArr(dist_result, graph->V);
     }
@@ -175,13 +181,15 @@ int *BellmanFord(Graph *graph, int src) {
     int neg_check = 0;
 
 // if graph still has a shorter path, then there's a negative cycle
-#pragma omp parallel for private(u, v, weight, i) schedule(static)
-    for (i = 0; i < V; i++) {
-        u = graph->edges[j].u;
-        v = graph->edges[j].v;
-        weight = graph->edges[j].cost;
+#pragma omp parallel for private(u, v, weight, i) shared(neg_check) schedule(static)
+    for (i = 0; i < E; i++) {
+        u = graph->edges[i].u;
+        v = graph->edges[i].v;
+        weight = graph->edges[i].cost;
 
-        // If negative cycle is detected, simply return
+        // a single write operation is needed for this, as it is basically 
+        // an "OR" operation (i.e. it is always zero unless a thread sets
+        // it to 1).
         if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
 #pragma omp atomic write
             neg_check = 1;
