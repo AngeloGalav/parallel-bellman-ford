@@ -5,7 +5,17 @@ From [Wikipedia](https://en.wikipedia.org/wiki/Bellman%E2%80%93Ford_algorithm):
 > The Bellman–Ford algorithm is an algorithm that computes shortest paths from a single source vertex to all of the other vertices in a weighted digraph.
 > It is slower than Dijkstra's algorithm for the same problem, but more versatile, as it is capable of handling graphs in which some of the edge weights are negative numbers.
 
+## Results
+The results of the experiment, as well as a thorough analysis of the implementation, can be found in the `project.pdf` file.
+
 ## Usage
+### Usage on a Slurm cluster
+Just run the `project.sbatch` file, which will compile and execute all models on all graphs:
+```
+sbatch project.sbatch
+```
+
+### Usage of single models
 - OpenMP
 ```
 ./omp-bf [threads] [graph_file] [-b BIDIRECTIONAL] [-d DEBUG]
