@@ -28,7 +28,7 @@ The parameter `mode` can be set to 0 to run the program on a single-thread, othe
 
 ## Compiling
 On both Linux and Windows, use the following commands to compile the project:
-- OpeMP
+- OpenMP
 ```
 gcc -o omp-bf openmp/omp_bellmanford.c -fopenmp -Wall
 ```
